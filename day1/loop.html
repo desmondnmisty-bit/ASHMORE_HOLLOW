@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Ashmore — Soft slice loop (3-day)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #140f18; color: #f5e9d8; font-family: system-ui, sans-serif; overflow: hidden; touch-action: none; }
+    #hud-top {
+      position: absolute; left: 10px; right: 10px; top: 10px; z-index: 4;
+      display: flex; justify-content: space-between; gap: 8px; pointer-events: none;
+    }
+    .chip {
+      background: rgba(18,12,24,.82); border-radius: 999px; padding: 7px 12px; font-size: 12px;
+      backdrop-filter: blur(6px);
+    }
+    .chip b { color: #ffb4a2; }
+    #needs {
+      position: absolute; left: 10px; top: 48px; z-index: 4;
+      background: rgba(18,12,24,.82); border-radius: 12px; padding: 8px 10px; font-size: 11px;
+      min-width: 132px; backdrop-filter: blur(6px);
+    }
+    .need { display: flex; justify-content: space-between; gap: 10px; margin: 3px 0; }
+    .need .bar { width: 64px; height: 6px; background: #2a2034; border-radius: 99px; overflow: hidden; align-self: center; }
+    .need .fill { height: 100%; background: #7dcea0; }
+    .need.low .fill { background: #e67e7e; }
+    #progress {
+      position: absolute; right: 10px; top: 48px; z-index: 4;
+      background: rgba(18,12,24,.82); border-radius: 12px; padding: 8px 10px; font-size: 11px;
+      max-width: 160px; backdrop-filter: blur(6px);
+    }
+    #stage { position: absolute; inset: 0; }
+    #stage iframe { border: 0; width: 100%; height: 100%; }
+    #panel {
+      position: absolute; left: 0; right: 0; bottom: 0; z-index: 5;
+      padding: 12px 14px 18px; background: linear-gradient(180deg, transparent, rgba(14,10,20,.95) 28%);
+    }
+    #title { margin: 0 0 4px; font-size: 15px; font-weight: 700; color: #ffb4a2; }
+    #body { margin: 0 0 12px; font-size: 13px; line-height: 1.4; opacity: .95; min-height: 40px; }
+    #actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    button.act {
+      flex: 1 1 40%; border: 0; border-radius: 12px; padding: 12px 10px;
+      background: #5c3d6e; color: #fff; font-weight: 650; font-size: 14px;
+    }
+    button.act.primary { background: #c45c48; }
+    button.act:disabled { opacity: .45; }
+    #toast {
+      position: absolute; left: 50%; bottom: 124px; transform: translateX(-50%);
+      z-index: 6; background: rgba(0,0,0,.72); padding: 8px 12px; border-radius: 10px;
+      font-size: 12px; opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 84%;
+      text-align: center;
+    }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="hud-top">
+    <div class="chip"><span id="day-label">Day 1</span> · <b id="beat-label">Home</b></div>
+    <div class="chip"><span id="clock">0:00</span> · aim ~30–40m full</div>
+  </div>
+  <div id="needs">
+    <div class="need" data-k="eat"><span>Eat</span><div class="bar"><div class="fill" style="width:35%"></div></div></div>
+    <div class="need" data-k="safety"><span>Safety</span><div class="bar"><div class="fill" style="width:55%"></div></div></div>
+    <div class="need" data-k="heat"><span>Heat</span><div class="bar"><div class="fill" style="width:40%"></div></div></div>
+    <div class="need" data-k="harmony"><span>Harmony</span><div class="bar"><div class="fill" style="width:20%"></div></div></div>
+  </div>
+  <div id="progress"><b id="step-label">Step</b><div id="step-detail">—</div></div>
+  <div id="stage"><iframe id="slice" src="../index.html" title="Soft village" allow="autoplay"></iframe></div>
+  <div id="toast"></div>
+  <div id="panel">
+    <p id="title">Wake in Soft cottage</p>
+    <p id="body"></p>
+    <div id="actions"></div>
+  </div>
+  <script>
+    // Shell kept; beats filled for play length (Idea Guy). Multi-step counters = content meat.
+    const beats = [
+      // —— Day 1 ——
+      {
+        day: 1, id: 'home', label: 'Home', title: 'Wake in Soft cottage',
+        body: 'Clay Soft home. Walk the yard — cream, timber, fairy cottages are live. Settle in before work.',
+        step: { key: 'homeLooks', need: 2, verb: 'Look around', done: 'Ready for the forge.', next: 'Head to job' },
+      },
+      {
+        day: 1, id: 'job', label: 'Job', title: 'Blacksmith job',
+        body: 'Long forge shift with Brute. Swing, short wait, swing again — greybox stand-in for real smithing.',
+        step: { key: 'swings', need: 48, verb: 'Swing', dwellMs: 12000,
+          labels: null,
+          done: 'Shift done — coin stub +3.', next: 'Go home to decorate' },
+        onTick: () => { state.needs.safety = Math.min(100, state.needs.safety + 1); },
+      },
+      {
+        day: 1, id: 'decorate', label: 'Decorate', title: 'Decorate home',
+        body: 'Place three cozy props. Each prop is place, then confirm.',
+        step: { key: 'props', need: 6, verb: 'Decorate', dwellMs: 1500,
+          labels: ['Place lamp', 'Confirm lamp', 'Place chair', 'Confirm chair', 'Place window flower', 'Confirm flower'],
+          done: 'Home feels warmer.', next: 'Cook & eat' },
+        onTick: (n) => { if (n % 2 === 0) state.needs.heat = Math.min(100, state.needs.heat + 12); },
+      },
+      {
+        day: 1, id: 'eat', label: 'Eat', title: 'Cook & eat',
+        body: 'Fridge → stove → plate. Fill Eat before night, then find the Witch.',
+        step: { key: 'meals', need: 2, verb: 'Cook / eat', labels: ['Prep meal', 'Eat'], done: 'Eat filled.', next: 'Find the Witch' },
+        onTick: (n) => { if (n >= 2) state.needs.eat = 100; else state.needs.eat = Math.min(100, state.needs.eat + 40); },
+      },
+      {
+        day: 1, id: 'spell', label: 'Spell', title: 'Learn Soft spark',
+        body: 'Witch mentor: watch once, then cast with a short hold on each spark.',
+        step: { key: 'casts', need: 5, verb: 'Practice spell', dwellMs: 4000,
+          labels: ['Watch mentor', 'Cast 1 (hold)', 'Cast 2 (hold)', 'Cast 3 (hold)', 'Lock Soft spark'],
+          done: 'Spell learned — Soft spark.', next: 'Sleep' },
+      },
+      {
+        day: 1, id: 'sleep1', label: 'Sleep', title: 'End Day 1',
+        body: 'Sleep closes Day 1. Day 2 opens on Harmony and town work.',
+        step: { key: 'sleep1', need: 1, verb: 'Sleep', done: 'Morning of Day 2.', next: null, advance: true },
+      },
+      // —— Day 2 ——
+      {
+        day: 2, id: 'd2_wake', label: 'Town', title: 'Day 2 — town morning',
+        body: 'Needs drip overnight. Check Harmony — neighbors notice Soft homes.',
+        step: { key: 'd2look', need: 2, verb: 'Check town', labels: ['Greet neighbor', 'Scan Harmony board'], done: 'Board read.', next: 'Work shift' },
+        onEnter: () => { state.needs.eat = Math.max(20, state.needs.eat - 25); state.needs.heat = Math.max(25, state.needs.heat - 15); },
+      },
+      {
+        day: 2, id: 'd2_job', label: 'Job', title: 'Day 2 job',
+        body: 'Town forge order. Longer shift, short wait between hits. Harmony ticks up as Soft work lands.',
+        step: { key: 'd2swings', need: 48, verb: 'Forge tick', dwellMs: 12000,
+          labels: null,
+          done: 'Town shift complete.', next: 'Build Harmony' },
+        onTick: () => { state.needs.safety = Math.min(100, state.needs.safety + 1); state.needs.harmony = Math.min(100, state.needs.harmony + 1); },
+      },
+      {
+        day: 2, id: 'd2_harmony', label: 'Harmony', title: 'Harmony festival tease',
+        body: 'Help three Soft townsfolk. Each favor fills Harmony toward the evening tease.',
+        step: { key: 'favors', need: 3, verb: 'Help Soft', labels: ['Granny errand', 'Witch herbs', 'Pale adventurer tip'], done: 'Festival tease unlocked.', next: 'Eat & rest' },
+        onTick: () => { state.needs.harmony = Math.min(100, state.needs.harmony + 18); },
+      },
+      {
+        day: 2, id: 'd2_eat', label: 'Needs', title: 'Day 2 needs',
+        body: 'Refill Eat and Heat before sleep. Raid rumors stir for Day 3.',
+        step: { key: 'd2needs', need: 2, verb: 'Tend needs', labels: ['Eat', 'Stoke hearth'], done: 'Needs steady.', next: 'Sleep' },
+        onTick: (n) => {
+          if (n === 1) state.needs.eat = 100;
+          if (n === 2) state.needs.heat = Math.min(100, state.needs.heat + 40);
+        },
+      },
+      {
+        day: 2, id: 'sleep2', label: 'Sleep', title: 'End Day 2',
+        body: 'Sleep. Dawn brings one Soft raid wave.',
+        step: { key: 'sleep2', need: 1, verb: 'Sleep', done: 'Raid morning.', next: null, advance: true },
+      },
+      // —— Day 3 ——
+      {
+        day: 3, id: 'raid_prep', label: 'Prep', title: 'Raid morning',
+        body: 'One wave. Optional Soft ward from Day‑1 spell, then brace the ruin line.',
+        step: { key: 'prep', need: 4, verb: 'Prep', dwellMs: 3000,
+          labels: ['Cast Soft ward (optional)', 'Brace ruin wall', 'Stock ammo crates', 'Call Soft lookouts'],
+          done: 'Line ready.', next: 'Start wave' },
+        onTick: (n) => { if (n === 1) state.ward = true; state.needs.safety = Math.min(100, state.needs.safety + 8); },
+      },
+      {
+        day: 3, id: 'raid', label: 'Raid', title: 'One Soft raid wave',
+        body: 'MonsterPack on the ruin line. Hold for a full minute-plus — short waits between repels. Ward softens Safety hits.',
+        step: { key: 'wave', need: 24, verb: 'Hold the line', dwellMs: 5000,
+          labels: null,
+          done: 'Wave cleared.', next: 'Morning repair' },
+        onTick: () => { state.needs.safety = Math.max(15, state.needs.safety - (state.ward ? 1 : 3)); },
+      },
+      {
+        day: 3, id: 'repair', label: 'Repair', title: 'Morning repair',
+        body: 'Patch Soft cottage chips. Wishlist CTA for the full town.',
+        step: { key: 'repair', need: 2, verb: 'Repair', labels: ['Patch roof', 'Wishlist CTA'], done: 'Slice complete — Soft hollow held.', next: null, finish: true },
+      },
+    ];
+
+    const state = {
+      i: 0,
+      counts: {},
+      ward: false,
+      dwellUntil: 0,
+      dwellTimer: null,
+      needs: { eat: 35, safety: 55, heat: 40, harmony: 20 },
+    };
+
+    const els = {
+      title: document.getElementById('title'),
+      body: document.getElementById('body'),
+      actions: document.getElementById('actions'),
+      beatLabel: document.getElementById('beat-label'),
+      dayLabel: document.getElementById('day-label'),
+      clock: document.getElementById('clock'),
+      toast: document.getElementById('toast'),
+      stepLabel: document.getElementById('step-label'),
+      stepDetail: document.getElementById('step-detail'),
+    };
+    const start = Date.now();
+    let toastTimer;
+    let entered = new Set();
+
+    setInterval(() => {
+      const s = Math.floor((Date.now() - start) / 1000);
+      els.clock.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }, 250);
+
+    function showToast(msg) {
+      els.toast.textContent = msg;
+      els.toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => els.toast.classList.remove('show'), 1500);
+    }
+
+    function paintNeeds() {
+      for (const el of document.querySelectorAll('.need')) {
+        const k = el.dataset.k;
+        const v = state.needs[k] ?? 0;
+        el.classList.toggle('low', v < 35);
+        el.querySelector('.fill').style.width = Math.max(0, Math.min(100, v)) + '%';
+      }
+    }
+
+    function count(key) { return state.counts[key] || 0; }
+
+    function render() {
+      const b = beats[state.i];
+      if (b.onEnter && !entered.has(b.id)) { b.onEnter(); entered.add(b.id); }
+      const c = count(b.step.key);
+      const need = b.step.need;
+      const done = c >= need;
+      els.dayLabel.textContent = `Day ${b.day}`;
+      els.beatLabel.textContent = b.label;
+      els.title.textContent = b.title;
+      let body = b.body;
+      if (b.step.labels && c < need) body += ` Next: ${b.step.labels[c]}.`;
+      els.body.textContent = body;
+      els.stepLabel.textContent = `${b.label} progress`;
+      els.stepDetail.textContent = `${Math.min(c, need)} / ${need}` + (done ? ' ✓' : '');
+
+      els.actions.innerHTML = '';
+      if (!done) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'act primary';
+        let label = b.step.labels && b.step.labels[c] ? b.step.labels[c] : b.step.verb;
+        if (!b.step.labels) label = `${b.step.verb} ${c + 1}/${need}`;
+        const left = state.dwellUntil ? Math.max(0, state.dwellUntil - Date.now()) : 0;
+        if (left > 0) {
+          btn.disabled = true;
+          btn.textContent = `${label} · ${Math.ceil(left / 1000)}s`;
+          clearTimeout(state.dwellTimer);
+          state.dwellTimer = setTimeout(render, Math.min(1000, left + 20));
+        } else {
+          btn.textContent = label;
+          btn.onclick = () => tick(b);
+        }
+        els.actions.appendChild(btn);
+      } else if (b.step.finish) {
+        const s = Math.floor((Date.now() - start) / 1000);
+        els.title.textContent = 'Soft slice complete';
+        els.body.textContent = `Greybox 3‑day shell finished in ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}. Content steps are in — real systems will stretch toward 30–40 min.`;
+        const replay = document.createElement('button');
+        replay.className = 'act primary'; replay.textContent = 'Replay slice';
+        replay.onclick = reset;
+        els.actions.appendChild(replay);
+        window.__AH_SLICE_DONE__ = true;
+      } else if (b.step.advance || b.step.next === null) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'act primary';
+        btn.textContent = b.step.done.includes('Day') || b.day ? (b.day < 3 ? `Wake Day ${b.day + 1}` : 'Continue') : 'Continue';
+        if (b.id.startsWith('sleep')) btn.textContent = b.day === 1 ? 'Wake Day 2' : 'Raid morning';
+        btn.onclick = () => { state.i += 1; render(); };
+        els.actions.appendChild(btn);
+      } else {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'act primary';
+        btn.textContent = b.step.next;
+        btn.onclick = () => { state.i += 1; render(); };
+        els.actions.appendChild(btn);
+      }
+      paintNeeds();
+      window.__AH_DAY__ = { beat: b.id, day: b.day, counts: { ...state.counts }, needs: { ...state.needs }, elapsedMs: Date.now() - start };
+    }
+
+    function tick(b) {
+      if (state.dwellUntil && Date.now() < state.dwellUntil) return;
+      const key = b.step.key;
+      state.counts[key] = count(key) + 1;
+      const c = count(key);
+      if (b.onTick) b.onTick(c);
+      const label = b.step.labels && b.step.labels[c - 1];
+      showToast(c >= b.step.need ? (typeof b.step.done === 'function' ? b.step.done() : b.step.done) : (label || b.step.verb) + ` (${c}/${b.step.need})`);
+      // Greybox work dwell on job / raid beats (pads toward 30–40m phone target)
+      if (c < b.step.need && b.step.dwellMs) {
+        state.dwellUntil = Date.now() + b.step.dwellMs;
+      } else {
+        state.dwellUntil = 0;
+      }
+      render();
+    }
+
+    function reset() {
+      state.i = 0; state.counts = {}; state.ward = false;
+      state.dwellUntil = 0; clearTimeout(state.dwellTimer);
+      state.needs = { eat: 35, safety: 55, heat: 40, harmony: 20 };
+      entered = new Set();
+      window.__AH_SLICE_DONE__ = false;
+      render();
+    }
+
+    // Fix raid done string (function was called too early in const)
+    beats.find(b => b.id === 'raid').step.done = 'Wave cleared — Soft hollow held.';
+
+    render();
+  </script>
+</body>
+</html>

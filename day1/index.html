@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Ashmore — Day 1 greybox</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #140f18; color: #f5e9d8; font-family: system-ui, sans-serif; overflow: hidden; }
+    #stage { position: absolute; inset: 0; display: flex; flex-direction: column; }
+    #view { flex: 1; position: relative; background: #1a1520; }
+    #view iframe { border: 0; width: 100%; height: 100%; }
+    #panel {
+      padding: 12px 14px 18px; background: rgba(18,12,24,.92); border-top: 1px solid #3a2a48;
+    }
+    #beat { font-size: 15px; font-weight: 650; margin: 0 0 6px; color: #ffb4a2; }
+    #hint { font-size: 13px; opacity: .9; margin: 0 0 12px; line-height: 1.35; }
+    #row { display: flex; gap: 8px; }
+    button {
+      flex: 1; border: 0; border-radius: 12px; padding: 12px 10px;
+      background: #5c3d6e; color: #fff; font-weight: 650; font-size: 14px;
+    }
+    button:active { transform: scale(.98); }
+    #timer { position: absolute; top: 10px; right: 10px; z-index: 3;
+      background: rgba(0,0,0,.55); padding: 6px 10px; border-radius: 999px; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div id="stage">
+    <div id="view">
+      <div id="timer">Day 1 greybox · <span id="t">0:00</span></div>
+      <iframe id="slice" src="../index.html" title="Soft slice"></iframe>
+    </div>
+    <div id="panel">
+      <p id="beat">1 · Home</p>
+      <p id="hint">Wake in Soft cottage. Tap Next to walk Day 1 beats (greybox — not the full sim loop).</p>
+      <div id="row"><button id="next" type="button">Next beat</button></div>
+    </div>
+  </div>
+  <script>
+    const beats = [
+      { t: '1 · Home', h: 'Wake in Soft cottage. Look around — cream / timber / fairy homes.' },
+      { t: '2 · Job', h: 'Blacksmith beat — hammer swing on the Brute. (Job stub.)' },
+      { t: '3 · Decorate', h: 'Place one cozy prop tag. (Greybox — no inventory yet.)' },
+      { t: '4 · Eat', h: 'Fridge/stove stub — Needs: Eat 1-tap.' },
+      { t: '5 · Spell', h: 'Witch mentor teaches 1 spell. (Select stub.)' },
+      { t: '6 · Sleep', h: 'End Day 1. Slice target ~30–40 min full 3-day; this greybox is a beat check only.' },
+    ];
+    let i = 0;
+    const beat = document.getElementById('beat');
+    const hint = document.getElementById('hint');
+    const next = document.getElementById('next');
+    const tEl = document.getElementById('t');
+    const start = Date.now();
+    setInterval(() => {
+      const s = Math.floor((Date.now() - start) / 1000);
+      tEl.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+    }, 250);
+    next.onclick = () => {
+      if (i >= beats.length - 1) {
+        beat.textContent = 'Day 1 greybox complete';
+        hint.textContent = 'Not a timed 40-min playable yet — needs wired loop. Soft scene + beat card only.';
+        next.disabled = true;
+        next.textContent = 'Done';
+        return;
+      }
+      i += 1;
+      beat.textContent = beats[i].t;
+      hint.textContent = beats[i].h;
+    };
+  </script>
+</body>
+</html>

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <title>Ashmore Hollow — Soft Slice (phone)</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #1a1520; overflow: hidden; font-family: system-ui, sans-serif; touch-action: none; }
+    #hud {
+      position: absolute; left: 10px; top: 10px; z-index: 2;
+      color: #f5e9d8; font-size: 12px; line-height: 1.35;
+      background: rgba(20,14,28,.75); padding: 8px 10px; border-radius: 10px;
+      max-width: 240px; backdrop-filter: blur(6px);
+    }
+    #hud b { color: #ffb4a2; }
+    canvas { display: block; width: 100%; height: 100%; }
+  </style>
+</head>
+<body>
+  <div id="hud">Ashmore Soft slice · phone<br><b id="status">Loading cottages…</b></div>
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+    const statusEl = document.getElementById('status');
+    const MAX_TEX = 1024;
+    const isPhone = Math.min(innerWidth, innerHeight) < 820 || /Mobi|Android/i.test(navigator.userAgent);
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1520);
+    scene.fog = new THREE.Fog(0x1a1520, 22, 55);
+
+    const camera = new THREE.PerspectiveCamera(isPhone ? 50 : 45, innerWidth / innerHeight, 0.1, 120);
+    camera.position.set(7.2, 4.6, 9.8);
+
+    const renderer = new THREE.WebGLRenderer({
+      antialias: !isPhone,
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: true,
+    });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, isPhone ? 1.5 : 2));
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.05;
+    renderer.shadowMap.enabled = !isPhone;
+    document.body.appendChild(renderer.domElement);
+
+    const hemi = new THREE.HemisphereLight(0xffe8d6, 0x3a2a48, 1.2);
+    scene.add(hemi);
+    const sun = new THREE.DirectionalLight(0xfff0e0, 1.25);
+    sun.position.set(8, 14, 6);
+    if (!isPhone) {
+      sun.castShadow = true;
+      sun.shadow.mapSize.set(1024, 1024);
+    }
+    scene.add(sun);
+    const fill = new THREE.PointLight(0xffd8b5, 1.35, 14, 2);
+    fill.position.set(3.2, 2.6, 4.2);
+    scene.add(fill);
+
+    const ground = new THREE.Mesh(
+      new THREE.CircleGeometry(22, 48),
+      new THREE.MeshStandardMaterial({ color: 0x3d5c45, roughness: 0.95, metalness: 0 })
+    );
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = !isPhone;
+    scene.add(ground);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 1.35, 0);
+    controls.enableDamping = true;
+    controls.maxPolarAngle = Math.PI * 0.49;
+    controls.enablePan = false;
+
+    const loader = new GLTFLoader();
+    const clock = new THREE.Clock();
+    const mixers = [];
+
+    // Cottages first, then characters (Idea Guy phone OOM fix). Kill: sci-fi / pipes / carriage.
+    const cottages = [
+      { file: 'AH_ENV_CottageCream_Game_v01.glb', pos: [-4.0, 0, -1.0], scale: 1, rot: 0.35, h: 4.0 },
+      { file: 'AH_ENV_CottageTimber_Game_v01.glb', pos: [4.4, 0, -0.4], scale: 1, rot: -0.4, h: 4.0 },
+      { file: 'AH_ENV_FairyCottage_PinkBlue_v01.glb', pos: [0.2, 0, -5.4], scale: 1, rot: 0.1, h: 3.8 },
+      { file: 'AH_ENV_SteampunkTower_Tall_v01.glb', pos: [-8.8, 0, -7.0], scale: 0.8, rot: 0.2, h: 6.8 },
+      { file: 'AH_ENV_RuinWallKit_v01.glb', pos: [8.6, 0, -6.4], scale: 1, rot: -0.5, h: 3.0 },
+    ];
+    const characters = [
+      { file: 'AH_CHR_Demoness_Purple_Walk_v01.glb', pos: [0.5, 0, 2.2], scale: 1, rot: Math.PI * 0.15, h: 2.1, focus: true },
+      { file: 'AH_CHR_Witch_Blue_TPose_v01.glb', pos: [-2.0, 0, 2.8], scale: 1, rot: 0.4, h: 2.0 },
+      { file: 'AH_CHR_Blacksmith_HammerSwing_v01.glb', pos: [3.2, 0, 3.0], scale: 1, rot: -0.6, h: 2.0, liftLight: true },
+      { file: 'AH_CHR_Granny_GreenCape_Anim_v01.glb', pos: [-5.0, 0, 2.6], scale: 1, rot: 0.8, h: 2.0 },
+      { file: 'AH_CHR_PaleAdventurer_TPose_v01.glb', pos: [5.2, 0, 2.4], scale: 1, rot: -0.9, h: 2.0 },
+      // MonsterPack after Soft QC phone pass
+    ];
+
+    function fitRoot(root, targetHeight) {
+      const box = new THREE.Box3().setFromObject(root);
+      const size = box.getSize(new THREE.Vector3());
+      if (size.y > 0.001) root.scale.multiplyScalar(targetHeight / size.y);
+      const box2 = new THREE.Box3().setFromObject(root);
+      root.position.y -= box2.min.y;
+    }
+
+    function capTexture(tex) {
+      if (!tex?.image) return;
+      const img = tex.image;
+      const w = img.width || img.videoWidth || 0;
+      const h = img.height || img.videoHeight || 0;
+      if (!w || !h) return;
+      const longest = Math.max(w, h);
+      if (longest <= MAX_TEX) return;
+      const scale = MAX_TEX / longest;
+      const nw = Math.max(1, Math.floor(w * scale));
+      const nh = Math.max(1, Math.floor(h * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = nw;
+      canvas.height = nh;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, nw, nh);
+      tex.image = canvas;
+      tex.needsUpdate = true;
+      if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+    }
+
+    function softMaterials(root, liftLight = false) {
+      root.traverse((o) => {
+        if (!o.isMesh) return;
+        o.castShadow = !isPhone;
+        o.receiveShadow = !isPhone;
+        const mats = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of mats) {
+          if (!m) continue;
+          for (const key of ['map', 'normalMap', 'roughnessMap', 'metalnessMap', 'emissiveMap', 'aoMap']) {
+            if (m[key]) capTexture(m[key]);
+          }
+          if ('metalness' in m) m.metalness = Math.min(m.metalness ?? 0, 0.08);
+          if ('roughness' in m) m.roughness = Math.max(m.roughness ?? 0.7, 0.65);
+          if ('envMapIntensity' in m) m.envMapIntensity = liftLight ? 0.55 : 0.2;
+          if (liftLight) {
+            if ('color' in m && m.color) m.color.offsetHSL(0, 0.02, 0.12);
+            if ('emissive' in m && m.emissive) {
+              m.emissive.setHex(0x3a2818);
+              m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.18);
+            }
+          }
+          m.needsUpdate = true;
+        }
+      });
+    }
+
+    async function resolveUrl(file) {
+      const phone = './assets_phone/' + file;
+      const base = './assets/' + file;
+      try {
+        const r = await fetch(phone, { method: 'HEAD' });
+        if (r.ok) return phone;
+      } catch (_) {}
+      return base;
+    }
+
+    async function loadOne(a) {
+      const url = await resolveUrl(a.file);
+      const gltf = await loader.loadAsync(url);
+      const root = gltf.scene;
+      softMaterials(root, !!a.liftLight);
+      fitRoot(root, a.h);
+      root.position.add(new THREE.Vector3(...a.pos));
+      root.rotation.y = a.rot;
+      root.scale.multiplyScalar(a.scale);
+      scene.add(root);
+      if (gltf.animations?.length) {
+        const mixer = new THREE.AnimationMixer(root);
+        mixer.clipAction(gltf.animations[0]).play();
+        mixers.push(mixer);
+      }
+      return a.focus ? root : null;
+    }
+
+    // Sequential: cottages → characters (never parallel dump)
+    let focusRoot = null;
+    let i = 0;
+    for (const a of cottages) {
+      i += 1;
+      statusEl.textContent = `Cottages ${i}/${cottages.length}`;
+      try { await loadOne(a); } catch (e) { console.error(a.file, e); }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+    let j = 0;
+    for (const a of characters) {
+      j += 1;
+      statusEl.textContent = `Characters ${j}/${characters.length}`;
+      try {
+        const r = await loadOne(a);
+        if (r) focusRoot = r;
+      } catch (e) { console.error(a.file, e); }
+      await new Promise((r) => requestAnimationFrame(r));
+    }
+
+    if (focusRoot) {
+      const c = new THREE.Box3().setFromObject(focusRoot).getCenter(new THREE.Vector3());
+      controls.target.copy(c);
+      camera.position.set(c.x + 3.6, c.y + 1.9, c.z + 4.8);
+      controls.update();
+    }
+    statusEl.textContent = 'WebGL ready · orbit';
+    window.__AH_SLICE_READY__ = true;
+
+    addEventListener('resize', () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    });
+
+    (function tick() {
+      const dt = clock.getDelta();
+      for (const m of mixers) m.update(dt);
+      controls.update();
+      renderer.render(scene, camera);
+      requestAnimationFrame(tick);
+    })();
+  </script>
+</body>
+</html>
