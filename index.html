@@ -36,10 +36,26 @@
     const isPhone = Math.min(innerWidth, innerHeight) < 820 || /Mobi|Android/i.test(navigator.userAgent);
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x1a1520);
-    scene.fog = new THREE.Fog(0x1a1520, 22, 55);
+    // Flat void looked generic — dusk equirect skybox (phone uses smaller jpg).
+    scene.background = new THREE.Color(0x2a1a38);
+    scene.fog = new THREE.Fog(0xb8899a, 26, 68);
 
-    const camera = new THREE.PerspectiveCamera(isPhone ? 50 : 45, innerWidth / innerHeight, 0.1, 120);
+    async function loadSkybox() {
+      const skyUrl = isPhone
+        ? './assets_phone/AH_ENV_Sky_Twilight_phone.jpg'
+        : './assets/AH_ENV_Sky_Twilight_v01.jpg';
+      try {
+        const tex = await new THREE.TextureLoader().loadAsync(skyUrl);
+        if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        scene.background = tex;
+      } catch (e) {
+        console.warn('skybox', e);
+      }
+    }
+    const skyReady = loadSkybox();
+
+    const camera = new THREE.PerspectiveCamera(isPhone ? 50 : 45, innerWidth / innerHeight, 0.1, 200);
     camera.position.set(7.2, 4.6, 9.8);
 
     const renderer = new THREE.WebGLRenderer({
